@@ -459,16 +459,13 @@ pub struct TypedBox2D<T, Unit = UnknownUnit> {
     pub max: TypedPoint2D<T, Unit>,
 }
 
-/// The default box type with no unit.
-pub type Box2D<T> = TypedBox2D<T, UnknownUnit>;
-
-impl<T, U> TypedBox2D<T, U> {
-    pub fn new(min: TypedPoint2D<T, U>, max: TypedPoint2D<T, U>) -> Self {
-        TypedBox2D { min, max }
-    }
+#[repr(C)]
+pub struct TypedBox2DOrEmpty<T, Unit = UnknownUnit> {
+    pub min: TypedPoint2D<T, Unit>,
+    pub max: TypedPoint2D<T, Unit>,
 }
 
-impl<T, U> TypedBox2D<T, U>
+impl<T, U> TypedBox2DOrEmpty<T, U>
 where T: Copy + Clone + Zero + One + PartialOrd + PartialEq + Add<Output=T> + Sub<Output=T> + Mul<Output=T> {
     /// Returns a rectangle if this box is positive.
     #[inline]
@@ -504,13 +501,46 @@ where T: Copy + Clone + Zero + One + PartialOrd + PartialEq + Add<Output=T> + Su
     }
 
     #[inline]
-    pub fn intersects(&self, other: &Self) -> bool {
-        self.intersection(other).is_positive()
+    pub fn intersection(&self, other: &Self) -> Self {
+        Self {
+            min: point2(max(self.min.x, other.min.x), max(self.min.y, other.min.y)),
+            max: point2(min(self.max.x, other.max.x), min(self.max.y, other.max.y)),
+        }
+    }
+}
+
+
+/// The default box type with no unit.
+pub type Box2D<T> = TypedBox2D<T, UnknownUnit>;
+
+impl<T, U> TypedBox2D<T, U> {
+    pub fn new(min: TypedPoint2D<T, U>, max: TypedPoint2D<T, U>) -> Self {
+        TypedBox2D { min, max }
+    }
+}
+
+impl<T, U> TypedBox2D<T, U>
+where T: Copy + Clone + Zero + One + PartialOrd + PartialEq + Add<Output=T> + Sub<Output=T> + Mul<Output=T> {
+    /// Returns a rectangle if this box is positive.
+    #[inline]
+    pub fn to_rect(&self) -> Option<TypedRect<T, U>> {
+        Some(TypedRect { origin: self.min, size: self.size() })
     }
 
     #[inline]
-    pub fn intersection(&self, other: &Self) -> Self {
-        TypedBox2D {
+    pub fn size(&self) -> TypedSize2D<T, U> {
+        (self.max - self.min).to_size()
+    }
+
+    #[inline]
+    pub fn intersects(&self, other: &Self) -> bool {
+        other.min.x < self.max.x && other.max.x > self.min.x &&
+            other.min.y < self.max.y && other.max.y > self.min.y
+    }
+
+    #[inline]
+    pub fn intersection(&self, other: &Self) -> TypedBox2DOrEmpty<T, U> {
+        TypedBox2DOrEmpty {
             min: point2(max(self.min.x, other.min.x), max(self.min.y, other.min.y)),
             max: point2(min(self.max.x, other.max.x), min(self.max.y, other.max.y)),
         }
@@ -518,14 +548,6 @@ where T: Copy + Clone + Zero + One + PartialOrd + PartialEq + Add<Output=T> + Su
 
     #[inline]
     pub fn union(&self, other: &Self) -> Self {
-        if other.is_empty_or_negative() {
-            return *self;
-        }
-
-        if self.is_empty_or_negative() {
-            return *other;
-        }
-
         TypedBox2D {
             min: point2(min(self.min.x, other.min.x), min(self.min.y, other.min.y)),
             max: point2(max(self.max.x, other.max.x), max(self.max.y, other.max.y)),
@@ -547,21 +569,10 @@ where T: Copy + Clone + Zero + One + PartialOrd + PartialEq + Add<Output=T> + Su
     /// `t` is expected to be between zero and one.
     #[inline]
     pub fn lerp(&self, other: Self, t: T) -> Self {
-        debug_assert!(self.is_positive());
-        debug_assert!(other.is_positive());
         Self::new(
             self.min.lerp(other.min, t),
             self.max.lerp(other.max, t),
         )
-    }
-
-    /// Return the same box if positive, or an empty box if negative.
-    ///
-    /// This is useful after computing intersections since the latter can produce negative boxes.
-    #[inline]
-    #[must_use]
-    pub fn ensure_positive(&self) -> Self {
-        TypedBox2D { min: self.min, max: self.max.max(self.min) }
     }
 }
 

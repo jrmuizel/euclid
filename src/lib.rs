@@ -81,7 +81,7 @@ pub use vector::{
 };
 pub use rect::{
     Rect, TypedRect, rect,
-    Box2D, TypedBox2D, box2,
+    Box2D, TypedBox2D, TypedBox2DOrEmpty, box2,
 };
 pub use side_offsets::{SideOffsets2D, TypedSideOffsets2D};
 #[cfg(feature = "unstable")] pub use side_offsets::SideOffsets2DSimdI32;
